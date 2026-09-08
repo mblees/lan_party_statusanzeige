@@ -15,13 +15,15 @@ tauschen geht also ohne Neucompilieren.
 - PNG, moeglichst <= 240x240 px (rundes Display, sichtbarer Kreis 234 px).
 - 8-bit RGB oder RGBA; Palette/Graustufen gehen auch.
 - Transparenz (Alpha) wird gegen die `bg`-Farbe aus `imageShowPng()` verrechnet.
-- Vorlagen aufbereiten (Groesse + Kreismaske):
+- Vorlagen aufbereiten (zoomt automatisch, bis die runde Anzeige randlos
+  gefuellt ist; Ueberstand wird zentriert abgeschnitten):
 
   ```
   python tools/prepare_image.py rohbild.png smoking
   ```
 
-  schreibt `data/smoking.png` passend zurecht.
+  schreibt `data/smoking.png` passend zurecht. `--fit` passt stattdessen das
+  ganze Bild ein (fuer freigestellte Icons), `--no-circle` laesst es eckig.
 
 Die Demo in `src/main.cpp` zeigt beim Start automatisch jede `*.png` aus dem
 Wurzelverzeichnis nacheinander an.

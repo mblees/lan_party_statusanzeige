@@ -97,11 +97,16 @@ Mehrfarbige Grafiken werden als PNG im LittleFS-Dateisystem des Pico 2
 abgelegt – getrennt von der Firmware, also austauschbar ohne Neucompilieren.
 
 1. PNG(s) in den Ordner [`data/`](data/) legen (ideal ≤ 240×240 px). Optional
-   aufbereiten (Größe anpassen + Kreismaske für das runde Display):
+   aufbereiten – zoomt automatisch so weit hinein, dass das runde Display
+   randlos gefüllt ist (Überstand wird zentriert abgeschnitten), legt eine
+   weiche Kreismaske an:
 
    ```bash
    python tools/prepare_image.py rohbild.png smoking
    ```
+
+   `--fit` passt stattdessen das ganze Bild ein (für freigestellte Icons mit
+   Transparenz), `--no-circle` lässt das Ergebnis rechteckig.
 
 2. Dateisystem flashen:
 
