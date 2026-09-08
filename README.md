@@ -86,9 +86,48 @@ pio device monitor -e pico2
 ## Bauen & Flashen
 
 ```bash
-pio run -e pico2 -t upload
+pio run -e pico2 -t upload      # Firmware
+pio run -e pico2 -t uploadfs    # Dateisystem (Bilder in data/)
 pio device monitor -e pico2
 ```
+
+## PNG-Bilder anzeigen (LittleFS)
+
+Mehrfarbige Grafiken werden als PNG im LittleFS-Dateisystem des Pico 2
+abgelegt – getrennt von der Firmware, also austauschbar ohne Neucompilieren.
+
+1. PNG(s) in den Ordner [`data/`](data/) legen (ideal ≤ 240×240 px). Optional
+   aufbereiten (Größe anpassen + Kreismaske für das runde Display):
+
+   ```bash
+   python tools/prepare_image.py rohbild.png smoking
+   ```
+
+2. Dateisystem flashen:
+
+   ```bash
+   pio run -e pico2 -t uploadfs
+   ```
+
+3. Der Pico zeigt nach dem Intro automatisch jede `*.png` aus dem
+   Wurzelverzeichnis nacheinander an (alle `IMAGE_DEMO_INTERVAL_MS`,
+   siehe [`src/main.cpp`](src/main.cpp)).
+
+Im eigenen Code:
+
+```cpp
+#include "image.h"
+
+imageBegin();                                  // in setup(), vor bootselResetBegin()
+imageShowPng(tft, "/smoking.png", GC9A01A_BLACK);
+```
+
+`imageShowPng()` zentriert das Bild (auch bei abweichender Größe), verrechnet
+Transparenz gegen die angegebene Hintergrundfarbe und schneidet Überbreite am
+Displayrand ab. Skaliert wird nicht – dafür `tools/prepare_image.py` nutzen.
+Details und Formatvergleich in [`data/README.md`](data/README.md).
+
+Einfarbige Logos/Icons bleiben als 1-Bit-Bitmap effizienter – siehe unten.
 
 ## Logo neu erzeugen
 

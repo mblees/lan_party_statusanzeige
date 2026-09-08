@@ -1,0 +1,175 @@
+#include "image.h"
+#include <Arduino.h>
+#include <LittleFS.h>
+#include <PNGdec.h>
+#include "config.h"
+
+// Zeilenpuffer-Grenze: der GC9A01 ist 240 px breit, etwas Reserve fuer
+// leicht zu grosse Vorlagen. Breitere PNGs weist imageShowPng() ab.
+#define IMAGE_MAX_WIDTH 320
+#define IMAGE_MAX_FILES 16
+#define IMAGE_NAME_MAX  48
+
+static PNG  s_png;      // ~40 KB im BSS - fuer den RP2350 (520 KB RAM) unkritisch
+static File s_file;
+
+static Adafruit_GC9A01A *s_tft     = nullptr;
+static int16_t           s_originX = 0;
+static int16_t           s_originY = 0;
+static uint16_t          s_bg      = 0x0000;
+static uint16_t          s_line[IMAGE_MAX_WIDTH];
+
+static char   s_names[IMAGE_MAX_FILES][IMAGE_NAME_MAX];
+static size_t s_count = 0;
+
+// --------------------------------------------------------------------------
+// PNGdec <-> LittleFS: Datei-Callbacks
+// --------------------------------------------------------------------------
+static void *pngOpen(const char *filename, int32_t *size)
+{
+    s_file = LittleFS.open(filename, "r");
+    if (!s_file)
+        return nullptr;
+    *size = s_file.size();
+    return &s_file;
+}
+
+static void pngClose(void *)
+{
+    if (s_file)
+        s_file.close();
+}
+
+static int32_t pngRead(PNGFILE *, uint8_t *buf, int32_t len)
+{
+    if (!s_file)
+        return 0;
+    return s_file.read(buf, len);
+}
+
+static int32_t pngSeek(PNGFILE *, int32_t pos)
+{
+    if (!s_file)
+        return 0;
+    return s_file.seek(pos) ? pos : 0;
+}
+
+// --------------------------------------------------------------------------
+// Decode-Callback: PNGdec liefert eine fertig dekodierte Pixelzeile
+// --------------------------------------------------------------------------
+static int pngDraw(PNGDRAW *pDraw)
+{
+    int w = pDraw->iWidth;
+    if (w > IMAGE_MAX_WIDTH)
+        w = IMAGE_MAX_WIDTH;
+
+    // RGB565, teiltransparente Pixel gegen s_bg verrechnet.
+    s_png.getLineAsRGB565(pDraw, s_line, PNG_RGB565_LITTLE_ENDIAN, s_bg);
+
+    const int16_t y = s_originY + pDraw->y;
+    if (y < 0 || y >= TFT_HEIGHT)
+        return 1;                       // Zeile liegt ausserhalb des Displays
+
+    int16_t   x = s_originX;
+    uint16_t *p = s_line;
+    if (x < 0) { p -= x; w += x; x = 0; }           // links abschneiden
+    if (x + w > TFT_WIDTH) w = TFT_WIDTH - x;       // rechts abschneiden
+    if (w <= 0)
+        return 1;
+
+    s_tft->startWrite();
+    s_tft->setAddrWindow(x, y, w, 1);
+    s_tft->writePixels(p, w);                       // Byte-Swap uebernimmt Adafruit
+    s_tft->endWrite();
+    return 1;
+}
+
+// --------------------------------------------------------------------------
+// oeffentliche API
+// --------------------------------------------------------------------------
+static void scanPngs()
+{
+    s_count = 0;
+    Dir dir = LittleFS.openDir("/");
+    while (dir.next() && s_count < IMAGE_MAX_FILES)
+    {
+        String name = dir.fileName();
+        if (!name.startsWith("/"))
+            name = "/" + name;
+
+        String lower = name;
+        lower.toLowerCase();
+        if (!lower.endsWith(".png"))
+            continue;
+
+        snprintf(s_names[s_count], IMAGE_NAME_MAX, "%s", name.c_str());
+        s_count++;
+    }
+}
+
+bool imageBegin()
+{
+    if (!LittleFS.begin())
+    {
+        Serial.println(F("[image] LittleFS-Mount fehlgeschlagen - "
+                         "'pio run -e pico2 -t uploadfs' ausgefuehrt?"));
+        return false;
+    }
+
+    scanPngs();
+    Serial.printf("[image] LittleFS ok, %u PNG(s) gefunden\n", (unsigned)s_count);
+    for (size_t i = 0; i < s_count; i++)
+        Serial.printf("        %s\n", s_names[i]);
+    return true;
+}
+
+size_t imageCount()
+{
+    return s_count;
+}
+
+const char *imageName(size_t i)
+{
+    return i < s_count ? s_names[i] : "";
+}
+
+bool imageShowPng(Adafruit_GC9A01A &tft, const char *path, uint16_t bg)
+{
+    s_tft = &tft;
+    s_bg  = bg;
+
+    int rc = s_png.open(path, pngOpen, pngClose, pngRead, pngSeek, pngDraw);
+    if (rc != PNG_SUCCESS)
+    {
+        Serial.printf("[image] open '%s' fehlgeschlagen (rc=%d)\n", path, rc);
+        return false;
+    }
+
+    const int w = s_png.getWidth();
+    const int h = s_png.getHeight();
+    Serial.printf("[image] %s  %dx%d  bpp=%d  pixeltype=%d\n",
+                  path, w, h, s_png.getBpp(), s_png.getPixelType());
+
+    if (w > IMAGE_MAX_WIDTH)
+    {
+        Serial.printf("[image] %d px zu breit (max %d) - Vorlage verkleinern\n",
+                      w, IMAGE_MAX_WIDTH);
+        s_png.close();
+        return false;
+    }
+
+    // Zentrieren - funktioniert unveraendert auch bei abweichender Bildgroesse.
+    s_originX = (int16_t)((TFT_WIDTH  - w) / 2);
+    s_originY = (int16_t)((TFT_HEIGHT - h) / 2);
+
+    tft.fillScreen(bg);
+    rc = s_png.decode(nullptr, 0);
+    s_png.close();
+
+    if (rc != PNG_SUCCESS)
+    {
+        Serial.printf("[image] decode '%s' fehlgeschlagen (rc=%d)\n", path, rc);
+        return false;
+    }
+    return true;
+}
