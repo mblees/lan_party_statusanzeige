@@ -7,21 +7,27 @@ Usage:
     python tools/prepare_image.py roh.png                # -> data/roh.png
     python tools/prepare_image.py foto.jpg ente          # -> data/ente.png
     python tools/prepare_image.py logo.png logo 200      # Zielflaeche 200 px
-    python tools/prepare_image.py icon.png --fit         # nicht zoomen (einpassen)
-    python tools/prepare_image.py bild.png --no-circle   # ohne Kreismaske
+    python tools/prepare_image.py icon.png --fit          # ganzes Bild einpassen
+    python tools/prepare_image.py visio.png --fit --no-trim  # Rand 1:1 behalten
+    python tools/prepare_image.py bild.png --no-circle    # ohne Kreismaske
 
-Was passiert (Standard):
-- vollstaendig transparente Raender wegschneiden
-- "Cover": so weit hineinzoomen, dass das Bild die komplette runde Anzeige
-  fuellt - kein Rand mehr sichtbar. Ueberstehende Bildteile werden zentriert
-  abgeschnitten.
-- weiche Kreismaske anlegen (sauberer Rand am runden Display)
-- als RGBA-PNG nach data/ schreiben  (dort holt es 'pio run -t uploadfs')
+Ablauf:
+1. transparente Raender wegschneiden   (aus, sobald --fit oder --no-trim)
+2. skalieren:
+   - Standard "Cover": so weit hineinzoomen, dass die runde Anzeige randlos
+     gefuellt ist; Ueberstand wird zentriert abgeschnitten.
+   - --fit: ganzes Bild proportional einpassen (nichts geht verloren, evtl.
+     bleibt aussen Rand).
+3. weiche Kreismaske (sauberer Rand am runden Display), --no-circle laesst es eckig
+4. als RGBA-PNG nach data/ schreiben  (dort holt es 'pio run -t uploadfs')
 
 Optionen:
-    --fit         statt Cover einpassen (ganzes Bild sichtbar, evtl. Rand).
-                  Sinnvoll fuer freigestellte Icons mit Transparenz.
-    --no-circle   keine Kreismaske (rechteckig lassen).
+    --fit         einpassen statt zoomen. Deaktiviert zugleich das automatische
+                  Wegschneiden transparenter Raender (--trim erzwingt es wieder).
+    --no-trim     transparente Raender NICHT wegschneiden (fuer Vorlagen, in
+                  denen der Abstand bewusst gesetzt ist, z. B. Visio-Export).
+    --trim        Raender wegschneiden, auch bei --fit.
+    --no-circle   keine Kreismaske.
 
 Auf dem Pico wird nichts mehr skaliert - das Bild kommt pixelgenau aufs Display.
 
@@ -33,7 +39,7 @@ import sys
 from PIL import Image, ImageChops, ImageDraw
 
 DEFAULT_SIZE = 240
-KNOWN_OPTS = {"--fit", "--no-circle"}
+KNOWN_OPTS = {"--fit", "--trim", "--no-trim", "--no-circle"}
 
 
 def resize_cover(im, size):
@@ -73,11 +79,20 @@ def main(argv):
     size = int(pos[2]) if len(pos) > 2 else DEFAULT_SIZE
     cover = "--fit" not in opts
     circle = "--no-circle" not in opts
+    # Raender wegschneiden: bei Cover Standard an, bei --fit Standard aus.
+    # --trim / --no-trim ueberschreiben das explizit.
+    if "--no-trim" in opts:
+        trim = False
+    elif "--trim" in opts:
+        trim = True
+    else:
+        trim = cover
 
     im = Image.open(src).convert("RGBA")
-    bbox = im.getbbox()
-    if bbox:
-        im = im.crop(bbox)
+    if trim:
+        bbox = im.getbbox()
+        if bbox:
+            im = im.crop(bbox)
 
     im = resize_cover(im, size) if cover else resize_fit(im, size)
 
@@ -93,8 +108,9 @@ def main(argv):
     os.makedirs("data", exist_ok=True)
     out = os.path.join("data", name + ".png")
     im.save(out, optimize=True)
-    mode = "cover/zoom" if cover else "fit"
-    print(f"{src} -> {out}  ({im.width}x{im.height}, {mode}"
+    print(f"{src} -> {out}  ({im.width}x{im.height}, "
+          f"{'cover/zoom' if cover else 'fit'}"
+          f"{', trim' if trim else ', kein trim'}"
           f"{', Kreis' if circle else ''})")
 
 

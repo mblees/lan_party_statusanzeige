@@ -105,8 +105,10 @@ abgelegt – getrennt von der Firmware, also austauschbar ohne Neucompilieren.
    python tools/prepare_image.py rohbild.png smoking
    ```
 
-   `--fit` passt stattdessen das ganze Bild ein (für freigestellte Icons mit
-   Transparenz), `--no-circle` lässt das Ergebnis rechteckig.
+   `--fit` passt stattdessen das ganze Bild ein und behält dabei einen bewusst
+   angelegten Rand (z. B. Visio-Export mit Abstand). `--no-trim` behält den
+   transparenten Rand auch im Cover-Modus, `--no-circle` lässt das Ergebnis
+   rechteckig.
 
 2. Dateisystem flashen:
 

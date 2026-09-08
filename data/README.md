@@ -22,8 +22,9 @@ tauschen geht also ohne Neucompilieren.
   python tools/prepare_image.py rohbild.png smoking
   ```
 
-  schreibt `data/smoking.png` passend zurecht. `--fit` passt stattdessen das
-  ganze Bild ein (fuer freigestellte Icons), `--no-circle` laesst es eckig.
+  schreibt `data/smoking.png` passend zurecht. `--fit` passt das ganze Bild ein
+  und behaelt einen bewusst gesetzten Rand (Visio-Export), `--no-trim` behaelt
+  den transparenten Rand auch im Cover-Modus, `--no-circle` laesst es eckig.
 
 Die Demo in `src/main.cpp` zeigt beim Start automatisch jede `*.png` aus dem
 Wurzelverzeichnis nacheinander an.
