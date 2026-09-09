@@ -6,17 +6,17 @@
 #include "intro.h"
 #include "circletext.h"
 #include "image.h"
+#include "touch.h"
 
 Adafruit_GC9A01A tft(TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN); // Hardware-SPI (SPI0)
 
-// ---- Demo: alle PNGs aus dem Dateisystem der Reihe nach zeigen ----
-#define IMAGE_DEMO_INTERVAL_MS 3000
+// ---- Alle PNGs aus dem Dateisystem der Reihe nach zeigen ----
+// Weitergeschaltet wird per TTP223-Touch-Taster (touch.h).
 
 static bool     s_haveFs   = false;
 static size_t   s_imgIndex = 0;
-static uint32_t s_nextAt   = 0;
 
-static void showNextImage()
+static void showImage(size_t index)
 {
     if (imageCount() == 0)
     {
@@ -25,11 +25,21 @@ static void showNextImage()
         return;
     }
 
-    const char *path = imageName(s_imgIndex);
+    const char *path = imageName(index);
     if (!imageShowPng(tft, path, GC9A01A_BLACK))
         circleTextShow(tft, path); // Fehlertext statt Bild
+}
+
+static void showNextImage()
+{
+    if (imageCount() == 0)
+    {
+        showImage(0); // gibt den Hinweistext aus
+        return;
+    }
 
     s_imgIndex = (s_imgIndex + 1) % imageCount();
+    showImage(s_imgIndex);
 }
 
 void setup()
@@ -43,6 +53,7 @@ void setup()
     s_haveFs = imageBegin();
 
     bootselResetBegin(); // BOOTSEL-Taster wirkt ab jetzt als Reset
+    touchBegin();        // TTP223-Touch-Taster schaltet die Bilder weiter
 
     SPI.setSCK(TFT_SCL_PIN);
     SPI.setTX(TFT_SDA_PIN);
@@ -57,8 +68,7 @@ void setup()
 
     if (s_haveFs)
     {
-        showNextImage(); // erstes Bild sofort
-        s_nextAt = millis() + IMAGE_DEMO_INTERVAL_MS;
+        showImage(s_imgIndex); // erstes Bild sofort
     }
     else
     {
@@ -68,9 +78,8 @@ void setup()
 
 void loop()
 {
-    if (s_haveFs && (int32_t)(millis() - s_nextAt) >= 0)
+    if (s_haveFs && touchPressed())
     {
         showNextImage();
-        s_nextAt += IMAGE_DEMO_INTERVAL_MS;
     }
 }

@@ -50,6 +50,32 @@ Braucht keine Verkabelung. Im laufenden Programm den BOOTSEL-Taster ~0,1 s
 gedrückt halten und **loslassen** → Warm-Reset. Details in
 `include/bootsel_reset.h`.
 
+### TTP223-Touch-Taster (Bild weiterschalten)
+
+Ein kapazitiver TTP223-Touch-Sensor schaltet bei jeder Berührung auf das
+**nächste PNG** weiter (statt eines Auto-Wechsels nach fester Zeit).
+
+| Modul-Pin | → Pico-2-Signal | Pico GPxx | Physischer Pin |
+|-----------|-----------------|-----------|----------------|
+| **VCC**   | 3V3(OUT)        | –         | **36**         |
+| **GND**   | GND             | –         | **38**         |
+| **SIG/OUT** | GPIO          | **GP16**  | **21**         |
+
+```
+   Pico 2                    TTP223
+ ┌─────────┐
+ │ Pin 36  ●─ 3V3 ───────────●  VCC
+ │ Pin 38  ●─ GND ───────────●  GND
+ │ Pin 21  ●─ GP16 ──────────●  SIG / OUT / I/O
+ └─────────┘
+```
+
+Standardmäßig arbeitet der TTP223 nicht-rastend und gibt bei Berührung `HIGH`
+aus. Rastenden bzw. active-low-Betrieb stellt man am Modul über die Lötbrücken
+`A`/`B` ein und passt dann `TOUCH_ACTIVE_HIGH` in
+[`include/config.h`](include/config.h) an. Pin und Entprellzeit stehen
+ebenfalls dort (`TOUCH_PIN`, `TOUCH_DEBOUNCE_MS`).
+
 ## Pin-Konfiguration ändern
 
 Alle Pins und Parameter stehen in [`include/config.h`](include/config.h):
@@ -63,6 +89,9 @@ Alle Pins und Parameter stehen in [`include/config.h`](include/config.h):
 | `TFT_RST_PIN` | `21` | GP-Nummer für RST |
 | `TFT_SPI_HZ` | `40000000` | SPI-Takt |
 | `TFT_ROTATION` | `0` | Display-Drehung 0..3 |
+| `TOUCH_PIN` | `16` | GP-Nummer für den SIG-Ausgang des TTP223 |
+| `TOUCH_ACTIVE_HIGH` | `1` | `1` = Berührung liefert HIGH (TTP223-Standard) |
+| `TOUCH_DEBOUNCE_MS` | `30` | Entprellzeit des Touch-Tasters [ms] |
 | `INTRO_DURATION_MS` | `3000` | Anzeigedauer des Logos |
 | `INTRO_LOGO_Y_OFFSET` | `10` | Logo-Versatz nach unten [px] |
 | `TFT_TEXT_SIZE` | `2` | Textgröße der Serial-Ausgabe (1 = 6×8 px/Zeichen) |
@@ -116,9 +145,9 @@ abgelegt – getrennt von der Firmware, also austauschbar ohne Neucompilieren.
    pio run -e pico2 -t uploadfs
    ```
 
-3. Der Pico zeigt nach dem Intro automatisch jede `*.png` aus dem
-   Wurzelverzeichnis nacheinander an (alle `IMAGE_DEMO_INTERVAL_MS`,
-   siehe [`src/main.cpp`](src/main.cpp)).
+3. Der Pico zeigt nach dem Intro das erste `*.png` aus dem Wurzelverzeichnis;
+   jede Berührung des TTP223-Touch-Tasters schaltet auf das nächste weiter
+   (siehe [`src/main.cpp`](src/main.cpp)).
 
 Im eigenen Code:
 

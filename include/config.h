@@ -23,6 +23,12 @@
 #define TFT_RST_PIN      21         // RST      -> GP21 (Pin 27)
 // VCC -> 3V3 (Pin 36), GND -> GND. Kein BLK-Pin (Backlight fest an).
 
+// ---- TTP223 kapazitiver Touch-Taster (Bild weiterschalten) ----
+// Modul-Pin -> Pico:  VCC -> 3V3 (Pin 36), GND -> GND (Pin 38), SIG -> unten.
+#define TOUCH_PIN          16       // SIG/OUT des TTP223 -> GP16 (Pin 21)
+#define TOUCH_ACTIVE_HIGH  1        // 1 = Beruehrung liefert HIGH (TTP223-Standard)
+#define TOUCH_DEBOUNCE_MS  30       // Entprellzeit [ms]
+
 // ---- Boot-/Intro-Screen ----
 #define INTRO_DURATION_MS   3000    // Anzeigedauer des Logos nach dem Boot [ms]
 #define INTRO_LOGO_Y_OFFSET 20      // Logo um so viele Pixel nach unten schieben
