@@ -22,6 +22,51 @@ static uint16_t          s_line[IMAGE_MAX_WIDTH];
 static char   s_names[IMAGE_MAX_FILES][IMAGE_NAME_MAX];
 static size_t s_count = 0;
 
+static uint8_t s_brightness = BRIGHTNESS_DEFAULT;   // 0..255, Software-Dimmung
+
+// Vollbild-Framebuffer (ungedimmt). Damit laesst sich die Helligkeit ohne
+// erneutes PNG-Dekodieren anpassen - imageRefresh() schiebt den Puffer nur
+// noch (gedimmt) auf das Display. ~115 KB im BSS, unkritisch fuer den RP2350.
+static uint16_t s_fb[TFT_WIDTH * TFT_HEIGHT];
+static bool     s_fbValid = false;
+
+// RGB565-Pixel linear abdunkeln (jeder Kanal * level / 255).
+static inline uint16_t dim565(uint16_t c)
+{
+    const uint8_t b = s_brightness;
+    if (b >= 255)
+        return c;
+    uint16_t r = ((c >> 11) & 0x1F) * b / 255;
+    uint16_t g = ((c >> 5)  & 0x3F) * b / 255;
+    uint16_t l = ( c        & 0x1F) * b / 255;
+    return (uint16_t)((r << 11) | (g << 5) | l);
+}
+
+// Framebuffer mit der aktuellen Helligkeit auf das Display schieben.
+static void blitFb()
+{
+    if (!s_tft)
+        return;
+
+    s_tft->startWrite();
+    s_tft->setAddrWindow(0, 0, TFT_WIDTH, TFT_HEIGHT);
+    if (s_brightness >= 255)
+    {
+        s_tft->writePixels(s_fb, (uint32_t)TFT_WIDTH * TFT_HEIGHT);
+    }
+    else
+    {
+        for (int16_t row = 0; row < TFT_HEIGHT; row++)
+        {
+            const uint16_t *src = &s_fb[row * TFT_WIDTH];
+            for (int16_t i = 0; i < TFT_WIDTH; i++)
+                s_line[i] = dim565(src[i]);
+            s_tft->writePixels(s_line, TFT_WIDTH);
+        }
+    }
+    s_tft->endWrite();
+}
+
 // --------------------------------------------------------------------------
 // PNGdec <-> LittleFS: Datei-Callbacks
 // --------------------------------------------------------------------------
@@ -77,10 +122,8 @@ static int pngDraw(PNGDRAW *pDraw)
     if (w <= 0)
         return 1;
 
-    s_tft->startWrite();
-    s_tft->setAddrWindow(x, y, w, 1);
-    s_tft->writePixels(p, w);                       // Byte-Swap uebernimmt Adafruit
-    s_tft->endWrite();
+    // Ungedimmt in den Framebuffer; die Ausgabe erfolgt gesammelt in blitFb().
+    memcpy(&s_fb[y * TFT_WIDTH + x], p, (size_t)w * sizeof(uint16_t));
     return 1;
 }
 
@@ -133,6 +176,22 @@ const char *imageName(size_t i)
     return i < s_count ? s_names[i] : "";
 }
 
+void imageSetBrightness(uint8_t level)
+{
+    s_brightness = level;
+}
+
+uint8_t imageGetBrightness()
+{
+    return s_brightness;
+}
+
+void imageRefresh()
+{
+    if (s_fbValid)
+        blitFb();
+}
+
 bool imageShowPng(Adafruit_GC9A01A &tft, const char *path, uint16_t bg)
 {
     s_tft = &tft;
@@ -162,14 +221,21 @@ bool imageShowPng(Adafruit_GC9A01A &tft, const char *path, uint16_t bg)
     s_originX = (int16_t)((TFT_WIDTH  - w) / 2);
     s_originY = (int16_t)((TFT_HEIGHT - h) / 2);
 
-    tft.fillScreen(bg);
+    // Framebuffer mit der Hintergrundfarbe fuellen (Rand um das Bild).
+    for (uint32_t i = 0; i < (uint32_t)TFT_WIDTH * TFT_HEIGHT; i++)
+        s_fb[i] = bg;
+
     rc = s_png.decode(nullptr, 0);
     s_png.close();
 
     if (rc != PNG_SUCCESS)
     {
         Serial.printf("[image] decode '%s' fehlgeschlagen (rc=%d)\n", path, rc);
+        s_fbValid = false;
         return false;
     }
+
+    s_fbValid = true;
+    blitFb();
     return true;
 }

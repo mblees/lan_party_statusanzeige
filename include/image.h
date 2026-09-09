@@ -35,4 +35,17 @@ bool imageShowPng(Adafruit_GC9A01A &tft, const char *path, uint16_t bg = 0x0000)
 size_t      imageCount();
 const char *imageName(size_t i);   // vollstaendiger Pfad, z. B. "/smoking.png"
 
+// Software-Helligkeit: skaliert beim Zeichnen jeden Pixel (0 = schwarz,
+// 255 = unveraendert). Das Display-Modul hat keinen Backlight-Pin, deshalb
+// wird die Helligkeit ueber die Pixelwerte nachgebildet. Wirkt ab dem
+// naechsten imageShowPng(); den aktuellen Inhalt ggf. neu zeichnen.
+void    imageSetBrightness(uint8_t level);
+uint8_t imageGetBrightness();
+
+// Zuletzt gezeigtes Bild mit der aktuellen Helligkeit erneut ausgeben - ohne
+// PNG-Dekodierung, nur ein (gedimmter) Kopiervorgang aus dem Framebuffer.
+// Schnell genug fuer Live-Aenderungen am Helligkeitsregler. Ohne vorheriges
+// erfolgreiches imageShowPng() passiert nichts.
+void    imageRefresh();
+
 #endif // IMAGE_H
