@@ -6,20 +6,22 @@
 #include "intro.h"
 #include "circletext.h"
 #include "image.h"
-#include "touch.h"
-#include "encoder.h"
+#include "button.h"
 #include "brightness.h"
 
 Adafruit_GC9A01A tft(TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN); // Hardware-SPI (SPI0)
 
-// ---- Alle PNGs aus dem Dateisystem der Reihe nach zeigen ----
-// TTP223-Touch-Taster : naechstes Bild
-// KY-040 drehen        : Helligkeit (Software-Dimmung, siehe image.h)
-// KY-040 druecken      : Display-Sleep an/aus
+// ---- Bedienung ----
+// TTP223 an TOUCH_IMAGE_PIN  : naechstes Bild
+// TTP223 an TOUCH_BRIGHT_PIN : naechste Helligkeitsstufe (0/25/50/75/100 %);
+//                              0 % legt das Display schlafen, jede andere weckt es
 
 static bool   s_haveFs   = false;
 static size_t s_imgIndex = 0;
 static bool   s_asleep   = false;
+
+static Button s_btnImage;
+static Button s_btnBright;
 
 static void showImage(size_t index)
 {
@@ -47,9 +49,9 @@ static void showNextImage()
     showImage(s_imgIndex);
 }
 
-// Display schlafen legen / aufwecken. Das Modul hat keinen Backlight-Pin,
-// die Beleuchtung bleibt also an - der Panel-Inhalt wird aber abgeschaltet
-// und der GC9A01 in den stromsparenden Sleep-Modus versetzt.
+// Display schlafen legen / aufwecken. Das Modul hat keinen Backlight-Pin, die
+// Beleuchtung bleibt also an (ausser bei Hardware-PWM, siehe brightness) - der
+// Panel-Inhalt wird abgeschaltet und der GC9A01 in den Sleep-Modus versetzt.
 static void displaySetSleep(bool sleep)
 {
     if (sleep == s_asleep)
@@ -73,6 +75,26 @@ static void displaySetSleep(bool sleep)
     }
 }
 
+// Reaktion auf einen Druck des Helligkeits-Touch.
+static void brightnessStepTouched()
+{
+    const uint8_t pct = brightnessNextStep();
+    Serial.printf("[brightness] %u%%\n", pct);
+
+    if (pct == 0)
+    {
+        displaySetSleep(true);
+    }
+    else if (s_asleep)
+    {
+        displaySetSleep(false); // weckt auf und zeichnet mit der neuen Helligkeit
+    }
+    else if (s_haveFs && brightnessNeedsRedraw())
+    {
+        imageRefresh();         // Software-Dimmung: sofort neu ausgeben
+    }
+}
+
 void setup()
 {
     Serial.begin(BAUD_RATE);
@@ -84,14 +106,14 @@ void setup()
     s_haveFs = imageBegin();
 
     bootselResetBegin(); // BOOTSEL-Taster wirkt ab jetzt als Reset
-    touchBegin();        // TTP223-Touch-Taster schaltet die Bilder weiter
-    encoderBegin();      // KY-040: Helligkeit + Sleep
+    buttonBegin(s_btnImage,  TOUCH_IMAGE_PIN,  TTP223_ACTIVE_HIGH, TTP223_DEBOUNCE_MS);
+    buttonBegin(s_btnBright, TOUCH_BRIGHT_PIN, TTP223_ACTIVE_HIGH, TTP223_DEBOUNCE_MS);
 
     SPI.setSCK(TFT_SCL_PIN);
     SPI.setTX(TFT_SDA_PIN);
     tft.begin(TFT_SPI_HZ);
     tft.setRotation(TFT_ROTATION);
-    brightnessBegin();   // Backlight-PWM bzw. Software-Dimmung, BRIGHTNESS_DEFAULT
+    brightnessBegin();   // Backlight-PWM bzw. Software-Dimmung, Startstufe
     tft.fillScreen(GC9A01A_BLACK);
 
     Serial.println("TFT initialised");
@@ -100,45 +122,25 @@ void setup()
     introShow(tft, INTRO_DURATION_MS);
 
     if (s_haveFs)
-    {
         showImage(s_imgIndex); // erstes Bild sofort
-    }
     else
-    {
         circleTextShow(tft, "LittleFS fehlt - 'pio run -e pico2 -t uploadfs'");
-    }
+
+    // Startstufe 0 % -> direkt schlafen legen.
+    if (brightnessStepPercent() == 0)
+        displaySetSleep(true);
 }
 
 void loop()
 {
-    // --- KY-040 Tastendruck: Display-Sleep umschalten ---
-    if (encoderButtonPressed())
-        displaySetSleep(!s_asleep);
+    // Beide Taster in jedem Durchlauf abfragen, damit die Entprellung sauber
+    // laeuft (auch der Bild-Taster, dessen Wirkung im Sleep entfaellt).
+    const bool brightHit = buttonPressed(s_btnBright);
+    const bool imageHit  = buttonPressed(s_btnImage);
 
-    // --- KY-040 drehen: Helligkeit anpassen ---
-    const int detents = encoderRead();
-    if (detents != 0)
-    {
-        const int oldLevel = brightnessGet();
-        int level = oldLevel - detents * BRIGHTNESS_STEP;
-        if (level < BRIGHTNESS_MIN) level = BRIGHTNESS_MIN;
-        if (level > BRIGHTNESS_MAX) level = BRIGHTNESS_MAX;
+    if (brightHit)
+        brightnessStepTouched();
 
-        // An der oberen/unteren Grenze aendert Weiterdrehen nichts.
-        if (level != oldLevel)
-        {
-            brightnessSet((uint8_t)level);
-            Serial.printf("[brightness] %d\n", level);
-
-            // Bei Software-Dimmung sofort neu ausgeben: imageRefresh() schiebt
-            // nur den Framebuffer (gedimmt) auf das Display, ohne das PNG neu
-            // zu dekodieren. Bei Hardware-PWM wirkt die Aenderung ohnehin sofort.
-            if (!s_asleep && s_haveFs && brightnessNeedsRedraw())
-                imageRefresh();
-        }
-    }
-
-    // --- TTP223: naechstes Bild (im Sleep ignoriert) ---
-    if (s_haveFs && !s_asleep && touchPressed())
+    if (imageHit && s_haveFs && !s_asleep)
         showNextImage();
 }

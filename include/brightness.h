@@ -19,14 +19,22 @@
 #endif
 
 // Einmal in setup() aufrufen (nach tft.begin()). Richtet ggf. die Backlight-PWM
-// ein und wendet BRIGHTNESS_DEFAULT an.
+// ein und wendet die Startstufe (BRIGHTNESS_START_IDX) an.
 void brightnessBegin();
 
-// Helligkeit 0..255 setzen.
+// Helligkeit direkt als 0..255 setzen.
 void brightnessSet(uint8_t level);
 
-// Aktuell gesetzte Helligkeit.
+// Aktuell gesetzte Helligkeit (0..255).
 uint8_t brightnessGet();
+
+// --- Stufenbetrieb (BRIGHTNESS_STEPS_PCT) ---
+// Auf die naechste Stufe weiterschalten (nach der letzten wieder auf die erste)
+// und anwenden. Liefert die neue Stufe in Prozent (0..100).
+uint8_t brightnessNextStep();
+
+// Aktuelle Stufe in Prozent (0..100).
+uint8_t brightnessStepPercent();
 
 // true, wenn eine Aenderung ein Neuzeichnen des Bildes erfordert
 // (Software-Dimmung). Bei Hardware-PWM false - die Anpassung ist sofort sichtbar.

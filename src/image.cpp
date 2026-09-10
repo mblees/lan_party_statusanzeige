@@ -22,7 +22,7 @@ static uint16_t          s_line[IMAGE_MAX_WIDTH];
 static char   s_names[IMAGE_MAX_FILES][IMAGE_NAME_MAX];
 static size_t s_count = 0;
 
-static uint8_t s_brightness = BRIGHTNESS_DEFAULT;   // 0..255, Software-Dimmung
+static uint8_t s_brightness = 255;   // 0..255, Software-Dimmung; setzt brightness.cpp
 
 // Vollbild-Framebuffer (ungedimmt). Damit laesst sich die Helligkeit ohne
 // erneutes PNG-Dekodieren anpassen - imageRefresh() schiebt den Puffer nur

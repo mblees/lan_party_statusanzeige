@@ -50,63 +50,40 @@ Braucht keine Verkabelung. Im laufenden Programm den BOOTSEL-Taster ~0,1 s
 gedrückt halten und **loslassen** → Warm-Reset. Details in
 `include/bootsel_reset.h`.
 
-### TTP223-Touch-Taster (Bild weiterschalten)
+### TTP223-Touch-Taster (2 Stück)
 
-Ein kapazitiver TTP223-Touch-Sensor schaltet bei jeder Berührung auf das
-**nächste PNG** weiter (statt eines Auto-Wechsels nach fester Zeit).
+Zwei kapazitive TTP223-Sensoren bedienen das Display:
 
-| Modul-Pin | → Pico-2-Signal | Pico GPxx | Physischer Pin |
-|-----------|-----------------|-----------|----------------|
-| **VCC**   | 3V3(OUT)        | –         | **36**         |
-| **GND**   | GND             | –         | **38**         |
-| **SIG/OUT** | GPIO          | **GP16**  | **21**         |
+| Funktion | Modul-Pin | → Pico GPxx | Physischer Pin |
+|----------|-----------|-------------|----------------|
+| **Bild weiter** | SIG/OUT | **GP16** | **21** |
+| **Helligkeitsstufe weiter** | SIG/OUT | **GP10** | **14** |
+
+`VCC` beider Module an `3V3` (Pin 36), `GND` an `GND` (Pin 38).
 
 ```
-   Pico 2                    TTP223
+   Pico 2                    TTP223 #1 (Bild)      TTP223 #2 (Helligkeit)
  ┌─────────┐
- │ Pin 36  ●─ 3V3 ───────────●  VCC
- │ Pin 38  ●─ GND ───────────●  GND
- │ Pin 21  ●─ GP16 ──────────●  SIG / OUT / I/O
+ │ Pin 36  ●─ 3V3 ───────────●  VCC ───────────────●  VCC
+ │ Pin 38  ●─ GND ───────────●  GND ───────────────●  GND
+ │ Pin 21  ●─ GP16 ──────────●  SIG
+ │ Pin 14  ●─ GP10 ──────────────────────────────  ●  SIG
  └─────────┘
 ```
+
+- **Bild-Touch:** schaltet auf das nächste PNG weiter.
+- **Helligkeits-Touch:** schaltet die Helligkeit stufenweise weiter –
+  `0 % → 25 % → 50 % → 75 % → 100 % → 0 % …` (`BRIGHTNESS_STEPS_PCT`).
+  Bei **0 %** geht das Display in den Sleep-Modus (`DISPOFF` + `SLPIN`), jede
+  andere Stufe weckt es wieder. Bei Software-Dimmung folgt die Anzeige sofort
+  (nur der gepufferte Frame wird neu ausgegeben, kein erneutes PNG-Dekodieren).
 
 Standardmäßig arbeitet der TTP223 nicht-rastend und gibt bei Berührung `HIGH`
 aus. Rastenden bzw. active-low-Betrieb stellt man am Modul über die Lötbrücken
-`A`/`B` ein und passt dann `TOUCH_ACTIVE_HIGH` in
-[`include/config.h`](include/config.h) an. Pin und Entprellzeit stehen
-ebenfalls dort (`TOUCH_PIN`, `TOUCH_DEBOUNCE_MS`).
+`A`/`B` ein und passt dann `TTP223_ACTIVE_HIGH` in
+[`include/config.h`](include/config.h) an (`TTP223_DEBOUNCE_MS` ebenfalls dort).
 
-### KY-040 Dreh-Encoder (Helligkeit + Sleep)
-
-Ein KY-040 stellt die **Helligkeit** ein; sein **Tastendruck** schaltet das
-Display in den Sleep-Modus und wieder zurück.
-
-| Modul-Pin | → Pico-2-Signal | Pico GPxx | Physischer Pin |
-|-----------|-----------------|-----------|----------------|
-| **+ / VCC** | 3V3(OUT)      | –         | **36**         |
-| **GND**   | GND             | –         | **38**         |
-| **CLK**   | GPIO            | **GP10**  | **14**         |
-| **DT**    | GPIO            | **GP11**  | **15**         |
-| **SW**    | GPIO            | **GP12**  | **16**         |
-
-```
-   Pico 2                    KY-040
- ┌─────────┐
- │ Pin 36  ●─ 3V3 ───────────●  +
- │ Pin 38  ●─ GND ───────────●  GND
- │ Pin 14  ●─ GP10 ──────────●  CLK
- │ Pin 15  ●─ GP11 ──────────●  DT
- │ Pin 16  ●─ GP12 ──────────●  SW
- └─────────┘
-```
-
-- **Drehen** ändert die Helligkeit in Schritten von `BRIGHTNESS_STEP` (Start bei
-  ≈ 70 %), nur wenn sich der Wert tatsächlich ändert – an der oberen bzw.
-  unteren Grenze passiert nichts. Die Anzeige folgt **sofort** pro Raste: bei
-  Software-Dimmung wird nur der gepufferte Frame neu (gedimmt) ausgegeben, das
-  PNG wird nicht erneut dekodiert.
-- **Drücken** legt das Display schlafen (`DISPOFF` + `SLPIN`) bzw. weckt es
-  wieder auf und baut das Bild neu auf.
+### Helligkeit
 
 **Zwei Betriebsarten** (Umschaltung über `TFT_BL_PIN` in
 [`include/config.h`](include/config.h)):
@@ -135,20 +112,15 @@ Alle Pins und Parameter stehen in [`include/config.h`](include/config.h):
 | `TFT_RST_PIN` | `21` | GP-Nummer für RST |
 | `TFT_SPI_HZ` | `40000000` | SPI-Takt |
 | `TFT_ROTATION` | `0` | Display-Drehung 0..3 |
-| `TOUCH_PIN` | `16` | GP-Nummer für den SIG-Ausgang des TTP223 |
-| `TOUCH_ACTIVE_HIGH` | `1` | `1` = Berührung liefert HIGH (TTP223-Standard) |
-| `TOUCH_DEBOUNCE_MS` | `30` | Entprellzeit des Touch-Tasters [ms] |
-| `ENC_CLK_PIN` / `ENC_DT_PIN` | `10` / `11` | GP-Nummern der KY-040-Quadratur |
-| `ENC_SW_PIN` | `12` | GP-Nummer des KY-040-Tasters |
-| `ENC_SW_ACTIVE_HIGH` | `0` | `0` = Taster zieht nach GND (KY-040-Standard) |
-| `ENC_SW_DEBOUNCE_MS` | `40` | Entprellzeit des Encoder-Tasters [ms] |
-| `ENC_FULL_STEP` | `0` | `0` = Halbschritt (1 Schritt/Raste bei den meisten KY-040); `1` falls es doppelt zählt |
+| `TOUCH_IMAGE_PIN` | `16` | GP-Nummer des TTP223 „Bild weiter" |
+| `TOUCH_BRIGHT_PIN` | `10` | GP-Nummer des TTP223 „Helligkeitsstufe weiter" |
+| `TTP223_ACTIVE_HIGH` | `1` | `1` = Berührung liefert HIGH (TTP223-Standard) |
+| `TTP223_DEBOUNCE_MS` | `30` | Entprellzeit der Touch-Taster [ms] |
 | `TFT_BL_PIN` | `-1` | GP-Nummer des Backlight-PWM (Hardware-Dimming); `-1` = Software-Dimmung |
 | `TFT_BL_PWM_HZ` | `1000` | PWM-Frequenz der Beleuchtung [Hz] |
 | `TFT_BL_ACTIVE_HIGH` | `1` | `1` = hoher Duty = hell |
-| `BRIGHTNESS_MIN` / `BRIGHTNESS_MAX` | `12` / `255` | Grenzen der Helligkeit (0..255) |
-| `BRIGHTNESS_DEFAULT` | `179` | Helligkeit nach dem Start (≈ 70 %) |
-| `BRIGHTNESS_STEP` | `16` | Helligkeitsänderung pro Encoder-Raste |
+| `BRIGHTNESS_STEPS_PCT` | `{0,25,50,75,100}` | Helligkeitsstufen in %, der Reihe nach durchgeschaltet |
+| `BRIGHTNESS_START_IDX` | `3` | Index der Startstufe (hier 75 %) |
 | `INTRO_DURATION_MS` | `3000` | Anzeigedauer des Logos |
 | `INTRO_LOGO_Y_OFFSET` | `10` | Logo-Versatz nach unten [px] |
 | `TFT_TEXT_SIZE` | `2` | Textgröße der Serial-Ausgabe (1 = 6×8 px/Zeichen) |

@@ -23,20 +23,14 @@
 #define TFT_RST_PIN      21         // RST      -> GP21 (Pin 27)
 // VCC -> 3V3 (Pin 36), GND -> GND. Kein BLK-Pin (Backlight fest an).
 
-// ---- TTP223 kapazitiver Touch-Taster (Bild weiterschalten) ----
-// Modul-Pin -> Pico:  VCC -> 3V3 (Pin 36), GND -> GND (Pin 38), SIG -> unten.
-#define TOUCH_PIN          16       // SIG/OUT des TTP223 -> GP16 (Pin 21)
-#define TOUCH_ACTIVE_HIGH  1        // 1 = Beruehrung liefert HIGH (TTP223-Standard)
-#define TOUCH_DEBOUNCE_MS  30       // Entprellzeit [ms]
+// ---- TTP223 kapazitive Touch-Taster (2 Stueck) ----
+// Modul je:  VCC -> 3V3 (Pin 36), GND -> GND (Pin 38), SIG/OUT -> GPxx.
+// TTP223-Standard: nicht-rastend, Ausgang bei Beruehrung HIGH.
+#define TTP223_ACTIVE_HIGH  1       // 1 = Beruehrung liefert HIGH
+#define TTP223_DEBOUNCE_MS  30      // Entprellzeit [ms]
 
-// ---- KY-040 Dreh-Encoder (Helligkeit; Tastendruck = Display-Sleep) ----
-// Modul-Pin -> Pico:  + -> 3V3 (Pin 36), GND -> GND (Pin 38), Rest siehe unten.
-// Helligkeit dreht "falsch herum"? CLK und DT tauschen.
-#define ENC_CLK_PIN         10      // CLK / A  -> GP10 (Pin 14)
-#define ENC_DT_PIN          11      // DT  / B  -> GP11 (Pin 15)
-#define ENC_SW_PIN          12      // SW (Tastendruck) -> GP12 (Pin 16)
-#define ENC_SW_ACTIVE_HIGH  0       // KY-040-Standard: Taster gegen GND -> LOW
-#define ENC_SW_DEBOUNCE_MS  20      // Entprellzeit des Encoder-Tasters [ms]
+#define TOUCH_IMAGE_PIN     16      // "naechstes Bild"        -> GP16 (Pin 21)
+#define TOUCH_BRIGHT_PIN    10      // "Helligkeitsstufe weiter" -> GP10 (Pin 14)
 
 // ---- Helligkeit ----
 // Zwei Betriebsarten, per TFT_BL_PIN gewaehlt:
@@ -55,10 +49,11 @@
 #define TFT_BL_PWM_HZ      1000     // PWM-Frequenz der Beleuchtung [Hz]
 #define TFT_BL_ACTIVE_HIGH 1        // 1 = HIGH/hoher Duty = hell
 
-#define BRIGHTNESS_MIN      12      // nie ganz dunkel, sonst wirkt es "aus"
-#define BRIGHTNESS_MAX      255
-#define BRIGHTNESS_DEFAULT  179     // Start bei ~70 % (0.70 * 255)
-#define BRIGHTNESS_STEP     16      // Aenderung pro Encoder-Raste
+// Helligkeitsstufen in Prozent. Der Bright-Touch schaltet der Reihe nach
+// weiter; nach der letzten Stufe geht es zurueck auf die erste.
+// 0 % = Display aus (Sleep-Modus); jede andere Stufe weckt es wieder.
+#define BRIGHTNESS_STEPS_PCT { 0, 25, 50, 75, 100 }
+#define BRIGHTNESS_START_IDX 3       // Startstufe (Index in obige Liste -> 75 %)
 
 // ---- Boot-/Intro-Screen ----
 #define INTRO_DURATION_MS   1000    // Anzeigedauer des Logos nach dem Boot [ms]
