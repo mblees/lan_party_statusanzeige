@@ -11,26 +11,30 @@ flackerfreiem Vollbild-Framebuffer, BOOTSEL-Taster als Software-Reset.
 Das Modul hat 7 Pins: `VCC  GND  SCL  SDA  DC  CS  RST`. Kein `BLK` –
 die Hintergrundbeleuchtung ist fest an.
 
+Alle Signalleitungen liegen auf der **linken Pico-2-Seite** (Boardpin 1–20),
+passend zum Gehäuse-Einbau. Nur `3V3(OUT)` gibt es ausschließlich rechts
+(Pin 36); `GND` lässt sich links abgreifen (Pin 3 oder 8).
+
 | Modul-Pin | → Pico-2-Signal | Pico GPxx | Physischer Pin |
 |-----------|-----------------|-----------|----------------|
-| **VCC**   | 3V3(OUT)        | –         | **36**         |
-| **GND**   | GND             | –         | **38**         |
-| **SCL**   | SPI0 SCK        | **GP18**  | **24**         |
-| **SDA**   | SPI0 TX (MOSI)  | **GP19**  | **25**         |
-| **DC**    | GPIO            | **GP20**  | **26**         |
-| **CS**    | SPI0 CS (GPIO)  | **GP17**  | **22**         |
-| **RST**   | GPIO            | **GP21**  | **27**         |
+| **VCC**   | 3V3(OUT)        | –         | **36** (rechts) |
+| **GND**   | GND             | –         | **8**          |
+| **SCL**   | SPI0 SCK        | **GP2**   | **4**          |
+| **SDA**   | SPI0 TX (MOSI)  | **GP3**   | **5**          |
+| **DC**    | GPIO            | **GP4**   | **6**          |
+| **CS**    | SPI0 CS (GPIO)  | **GP1**   | **2**          |
+| **RST**   | GPIO            | **GP5**   | **7**          |
 
 ```
    Pico 2                         M128_240240 (GC9A01)
  ┌─────────┐
- │ Pin 36  ●─ 3V3(OUT) ───────────●  VCC
- │ Pin 38  ●─ GND  ───────────────●  GND
- │ Pin 24  ●─ GP18 ───────────────●  SCL
- │ Pin 25  ●─ GP19 ───────────────●  SDA
- │ Pin 26  ●─ GP20 ───────────────●  DC
- │ Pin 22  ●─ GP17 ───────────────●  CS
- │ Pin 27  ●─ GP21 ───────────────●  RST
+ │ Pin 2   ●─ GP1  ───────────────●  CS
+ │ Pin 4   ●─ GP2  ───────────────●  SCL
+ │ Pin 5   ●─ GP3  ───────────────●  SDA
+ │ Pin 6   ●─ GP4  ───────────────●  DC
+ │ Pin 7   ●─ GP5  ───────────────●  RST
+ │ Pin 8   ●─ GND  ───────────────●  GND
+ │ Pin 36  ●─ 3V3(OUT) ───────────●  VCC   (rechte Seite)
  └─────────┘
 ```
 
@@ -39,7 +43,8 @@ die Hintergrundbeleuchtung ist fest an.
 - **VCC an 3V3(OUT), nicht an 5 V.** Das Modul hat zwar einen Regler, aber die
   Logikpegel sind 3,3 V und der RP2350 ist nicht 5-V-tolerant.
 - SCL/SDA müssen auf demselben SPI-Block liegen (hier SPI0). Werden andere Pins
-  gewählt, eine gültige SPI0-Kombination nehmen (SCK: 2/6/18, TX: 3/7/19).
+  gewählt, eine gültige SPI0-Kombination nehmen (SCK: GP2/GP6/GP18,
+  TX: GP3/GP7/GP19).
 - `DC`, `CS`, `RST` sind normale GPIOs und frei wählbar.
 - SPI-Takt ist `TFT_SPI_HZ` = 40 MHz. Bei Bildartefakten über lange Jumper auf
   `24000000` senken; für flüssigeren Screensaver auf `62500000` erhöhen.
@@ -56,18 +61,18 @@ Zwei kapazitive TTP223-Sensoren bedienen das Display:
 
 | Funktion | Modul-Pin | → Pico GPxx | Physischer Pin |
 |----------|-----------|-------------|----------------|
-| **Bild weiter** | SIG/OUT | **GP16** | **21** |
-| **Helligkeitsstufe weiter** | SIG/OUT | **GP10** | **14** |
+| **Bild weiter** | SIG/OUT | **GP6** | **9** |
+| **Helligkeitsstufe weiter** | SIG/OUT | **GP7** | **10** |
 
-`VCC` beider Module an `3V3` (Pin 36), `GND` an `GND` (Pin 38).
+`VCC` beider Module an `3V3` (Pin 36, rechts), `GND` an `GND` (Pin 8, links).
 
 ```
    Pico 2                    TTP223 #1 (Bild)      TTP223 #2 (Helligkeit)
  ┌─────────┐
- │ Pin 36  ●─ 3V3 ───────────●  VCC ───────────────●  VCC
- │ Pin 38  ●─ GND ───────────●  GND ───────────────●  GND
- │ Pin 21  ●─ GP16 ──────────●  SIG
- │ Pin 14  ●─ GP10 ──────────────────────────────  ●  SIG
+ │ Pin 8   ●─ GND ───────────●  GND ───────────────●  GND
+ │ Pin 9   ●─ GP6 ───────────●  SIG
+ │ Pin 10  ●─ GP7 ──────────────────────────────── ●  SIG
+ │ Pin 36  ●─ 3V3 ───────────●  VCC ───────────────●  VCC   (rechte Seite)
  └─────────┘
 ```
 
@@ -105,15 +110,15 @@ Alle Pins und Parameter stehen in [`include/config.h`](include/config.h):
 
 | Define | Standard | Bedeutung |
 |--------|----------|-----------|
-| `TFT_SCL_PIN` | `18` | GP-Nummer für SCL/SCK |
-| `TFT_SDA_PIN` | `19` | GP-Nummer für SDA/MOSI |
-| `TFT_DC_PIN` | `20` | GP-Nummer für DC |
-| `TFT_CS_PIN` | `17` | GP-Nummer für CS |
-| `TFT_RST_PIN` | `21` | GP-Nummer für RST |
+| `TFT_SCL_PIN` | `2` | GP-Nummer für SCL/SCK (SPI0 SCK: GP2/GP6/GP18) |
+| `TFT_SDA_PIN` | `3` | GP-Nummer für SDA/MOSI (SPI0 TX: GP3/GP7/GP19) |
+| `TFT_DC_PIN` | `4` | GP-Nummer für DC |
+| `TFT_CS_PIN` | `1` | GP-Nummer für CS |
+| `TFT_RST_PIN` | `5` | GP-Nummer für RST |
 | `TFT_SPI_HZ` | `40000000` | SPI-Takt |
 | `TFT_ROTATION` | `0` | Display-Drehung 0..3 |
-| `TOUCH_IMAGE_PIN` | `16` | GP-Nummer des TTP223 „Bild weiter" |
-| `TOUCH_BRIGHT_PIN` | `10` | GP-Nummer des TTP223 „Helligkeitsstufe weiter" |
+| `TOUCH_IMAGE_PIN` | `6` | GP-Nummer des TTP223 „Bild weiter" |
+| `TOUCH_BRIGHT_PIN` | `7` | GP-Nummer des TTP223 „Helligkeitsstufe weiter" |
 | `TTP223_ACTIVE_HIGH` | `1` | `1` = Berührung liefert HIGH (TTP223-Standard) |
 | `TTP223_DEBOUNCE_MS` | `30` | Entprellzeit der Touch-Taster [ms] |
 | `TFT_BL_PIN` | `-1` | GP-Nummer des Backlight-PWM (Hardware-Dimming); `-1` = Software-Dimmung |
