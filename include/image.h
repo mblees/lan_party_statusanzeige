@@ -1,22 +1,23 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+#include <Adafruit_GFX.h>
 #include <Adafruit_GC9A01A.h>
 
-// PNG-Bilder aus dem LittleFS-Dateisystem des Pico 2 anzeigen.
+// PNG-Bilder aus dem LittleFS-Dateisystem des ESP32-C3 anzeigen.
 //
 // Bilder liegen im Projektordner unter data/ und werden getrennt von der
 // Firmware ins Flash geschrieben:
 //
-//     pio run -e pico2 -t uploadfs      (Dateisystem flashen)
-//     pio run -e pico2 -t upload        (Firmware flashen)
+//     pio run -t uploadfs             (Dateisystem flashen)
+//     pio run -t upload          (Firmware flashen)
 //
 // So lassen sich Grafiken austauschen, ohne neu zu kompilieren.
 
 // LittleFS einbinden und das Wurzelverzeichnis nach *.png durchsuchen.
 // MUSS vor dem ersten imageShowPng() und vor bootselResetBegin() laufen:
 // scheitert das Mounten, formatiert LittleFS das Flash - ein Schreibzugriff,
-// der nicht mit dem BOOTSEL-Reset-Timer kollidieren darf.
+// der nicht mit dem Reset-Tasten-Timer kollidieren darf.
 // Liefert false, wenn kein Dateisystem verfuegbar ist.
 bool imageBegin();
 
@@ -42,10 +43,26 @@ const char *imageName(size_t i);   // vollstaendiger Pfad, z. B. "/smoking.png"
 void    imageSetBrightness(uint8_t level);
 uint8_t imageGetBrightness();
 
-// Zuletzt gezeigtes Bild mit der aktuellen Helligkeit erneut ausgeben - ohne
-// PNG-Dekodierung, nur ein (gedimmter) Kopiervorgang aus dem Framebuffer.
-// Schnell genug fuer Live-Aenderungen am Helligkeitsregler. Ohne vorheriges
-// erfolgreiches imageShowPng() passiert nichts.
+// Zuletzt gezeigten Inhalt mit der aktuellen Helligkeit erneut ausgeben - ohne
+// Neuaufbau, nur ein (gedimmter) Kopiervorgang aus dem Framebuffer. Schnell
+// genug fuer Live-Aenderungen am Helligkeitsregler. Ohne vorheriges
+// imageShowPng()/imageShowText() passiert nichts.
 void    imageRefresh();
+
+// Text zentriert im sichtbaren Kreis ausgeben - inhaltlich wie circleTextShow(),
+// aber ueber den Vollbild-Framebuffer. Dadurch wirken die Helligkeitsstufen
+// (Software-Dimmung) auch auf Text, und imageRefresh() stellt ihn nach dem
+// Aufwachen aus dem Sleep-Modus wieder her.
+void    imageShowText(Adafruit_GC9A01A &tft, const char *text);
+
+// --- Zusammengesetzte Frames (mehrere Grafik-/Text-Elemente) -------------
+// Ablauf: imageBeginFrame() -> beliebig oft in imageCanvas() zeichnen
+// (GFX-Primitive, circleTextShowIn(), ...) -> imageEndFrame(tft).
+// Der Aufbau erfolgt ungedimmt im Vollbild-Framebuffer; imageEndFrame()
+// schiebt ihn (mit der aktuellen Helligkeit) auf das Display, und
+// imageRefresh() stellt ihn nach dem Aufwachen wieder her.
+void          imageBeginFrame(uint16_t bg = 0x0000);
+Adafruit_GFX &imageCanvas();
+void          imageEndFrame(Adafruit_GC9A01A &tft);
 
 #endif // IMAGE_H

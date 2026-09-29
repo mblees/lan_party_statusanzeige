@@ -5,8 +5,12 @@
 
 #define BAUD_RATE 115200
 
-// ---- BOOTSEL-Taster als Reset (Timer-Interrupt) ----
-#define BOOTSEL_RESET_POLL_MS 25     // Abtastintervall des Timer-Interrupts [ms]
+#ifndef ARDUINO_ARCH_ESP32
+#error "config.h: dieses Projekt ist fuer den ESP32-C3 Super Mini - 'pio run' verwenden."
+#endif
+
+// ---- BOOT-Taster als Reset (esp_timer) ----
+#define BOOTSEL_RESET_POLL_MS 25     // Abtastintervall [ms]
 #define BOOTSEL_RESET_HOLD_MS 50     // Mindest-Druckdauer bis Warm-Reset [ms]
 
 // ---- Display M128_240240-RGB-7-V1.0 (GC9A01, 1.28" rund, 240x240, SPI) ----
@@ -15,25 +19,28 @@
 #define TFT_ROTATION     0          // 0..3
 #define TFT_SPI_HZ       40000000UL // SPI-Takt; bei langen Leitungen ggf. senken
 
-// Alle Signale liegen auf der linken Pico-2-Seite (Boardpin 1..20), damit die
-// Verkabelung zum Gehaeuse-Einbau passt. SCL/SDA sind eine gueltige
-// SPI0-Kombination (SCK: GP2/GP6, TX: GP3/GP7). Modul-Pin -> Pico:
-#define TFT_SCL_PIN      2          // SCL/SCK  -> GP2 (Pin 4)
-#define TFT_SDA_PIN      3          // SDA/MOSI -> GP3 (Pin 5)
-#define TFT_DC_PIN       4          // DC       -> GP4 (Pin 6)
-#define TFT_CS_PIN       1          // CS       -> GP1 (Pin 2)
-#define TFT_RST_PIN      5          // RST      -> GP5 (Pin 7)
-// VCC -> 3V3 (Pin 36, rechts - einzige 3V3-Quelle), GND -> GND (z. B. Pin 3
-// oder 8, links). Kein BLK-Pin (Backlight fest an).
+// ESP32-C3 Super Mini: SPI laeuft ueber die GPIO-Matrix und ist frei auf
+// beliebige Pins legbar. GPIO8/GPIO9 bleiben frei (9 = eingebauter BOOT-Taster,
+// dient als Reset-Ersatz, siehe bootsel_reset.cpp; 8 = Strapping-Pin/LED),
+// GPIO20/21 bleiben der USB-Serial-Konsole vorbehalten.
+// GPIO0 bewusst nicht fuer CS/DC/RST verwendet: der Literal 0 waere sonst als
+// Nullpointer-Konstante lesbar und macht den Adafruit_GC9A01A-Konstruktor
+// mehrdeutig - GPIO0 dient als freier Ersatzpin (z. B. Backlight-PWM).
+#define TFT_SCL_PIN      1          // SCL/SCK  -> GPIO1
+#define TFT_SDA_PIN      3          // SDA/MOSI -> GPIO3
+#define TFT_DC_PIN       4          // DC       -> GPIO4
+#define TFT_CS_PIN       10         // CS       -> GPIO10
+#define TFT_RST_PIN      5          // RST      -> GPIO5
+// VCC -> 3V3, GND -> GND. Kein BLK-Pin (Backlight fest an).
 
 // ---- TTP223 kapazitive Touch-Taster (2 Stueck) ----
-// Modul je:  VCC -> 3V3 (Pin 36), GND -> GND (Pin 8), SIG/OUT -> GPxx (links).
+// Modul je:  VCC -> 3V3, GND -> GND, SIG/OUT -> GPIOxx.
 // TTP223-Standard: nicht-rastend, Ausgang bei Beruehrung HIGH.
 #define TTP223_ACTIVE_HIGH  1       // 1 = Beruehrung liefert HIGH
 #define TTP223_DEBOUNCE_MS  30      // Entprellzeit [ms]
 
-#define TOUCH_IMAGE_PIN     6       // "naechstes Bild"          -> GP6 (Pin 9)
-#define TOUCH_BRIGHT_PIN    7       // "Helligkeitsstufe weiter"  -> GP7 (Pin 10)
+#define TOUCH_IMAGE_PIN     6       // "naechstes Bild"          -> GPIO6
+#define TOUCH_BRIGHT_PIN    7       // "Helligkeitsstufe weiter"  -> GPIO7
 
 // ---- Helligkeit ----
 // Zwei Betriebsarten, per TFT_BL_PIN gewaehlt:
@@ -48,8 +55,8 @@
 //     Transistor/MOSFET an diesen PWM-GPIO legen. Dann ist die Helligkeit echt
 //     (bis zum physikalischen Maximum des Displays), die Pixel werden nicht
 //     mehr gedimmt und der Sleep-Modus schaltet die Beleuchtung wirklich aus.
-#define TFT_BL_PIN         -1       // GPxx des Backlight-PWM (frei links: GP8/Pin11,
-                                    // GP9/Pin12), oder -1 = nicht verdrahtet
+#define TFT_BL_PIN         -1       // GPIO0 waere frei fuer Backlight-PWM,
+                                    // oder -1 = nicht verdrahtet
 #define TFT_BL_PWM_HZ      1000     // PWM-Frequenz der Beleuchtung [Hz]
 #define TFT_BL_ACTIVE_HIGH 1        // 1 = HIGH/hoher Duty = hell
 

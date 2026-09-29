@@ -9,7 +9,7 @@
 #include "button.h"
 #include "brightness.h"
 
-Adafruit_GC9A01A tft(TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN); // Hardware-SPI (SPI0)
+Adafruit_GC9A01A tft(TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN); // Hardware-SPI (Standard-Bus)
 
 // ---- Bedienung ----
 // TTP223 an TOUCH_IMAGE_PIN  : naechstes Bild
@@ -27,14 +27,14 @@ static void showImage(size_t index)
 {
     if (imageCount() == 0)
     {
-        circleTextShow(tft, "Keine PNGs im Dateisystem. Bilder nach data/ "
-                            "legen und 'pio run -e pico2 -t uploadfs'");
+        imageShowText(tft, "Keine PNGs im Dateisystem. Bilder nach data/ "
+                            "legen und 'pio run -t uploadfs'");
         return;
     }
 
     const char *path = imageName(index);
     if (!imageShowPng(tft, path, GC9A01A_BLACK))
-        circleTextShow(tft, path); // Fehlertext statt Bild
+        imageShowText(tft, path); // Fehlertext statt Bild
 }
 
 static void showNextImage()
@@ -100,17 +100,17 @@ void setup()
     Serial.begin(BAUD_RATE);
     Serial.println("Serial connected.");
 
-    // LittleFS zuerst mounten: schlaegt das Mounten fehl, formatiert LittleFS
-    // das Flash - dieser Schreibzugriff soll abgeschlossen sein, bevor der
-    // BOOTSEL-Reset-Timer laeuft (der gibt die Flash-CS-Leitung kurz frei).
     s_haveFs = imageBegin();
 
-    bootselResetBegin(); // BOOTSEL-Taster wirkt ab jetzt als Reset
+    bootselResetBegin(); // BOOT-Taster (GPIO9) wirkt ab jetzt als Reset
     buttonBegin(s_btnImage,  TOUCH_IMAGE_PIN,  TTP223_ACTIVE_HIGH, TTP223_DEBOUNCE_MS);
     buttonBegin(s_btnBright, TOUCH_BRIGHT_PIN, TTP223_ACTIVE_HIGH, TTP223_DEBOUNCE_MS);
 
-    SPI.setSCK(TFT_SCL_PIN);
-    SPI.setTX(TFT_SDA_PIN);
+    // ESP32-C3: SPI-Pins gehen ueber die GPIO-Matrix, direkt an begin()
+    // uebergeben (MISO wird nicht verwendet -> -1). tft.begin() ruft intern
+    // SPI.begin() ohne Argumente auf; das ist dann ein No-op und behaelt
+    // diese Zuordnung.
+    SPI.begin(TFT_SCL_PIN, -1, TFT_SDA_PIN, TFT_CS_PIN);
     tft.begin(TFT_SPI_HZ);
     tft.setRotation(TFT_ROTATION);
     brightnessBegin();   // Backlight-PWM bzw. Software-Dimmung, Startstufe
@@ -124,7 +124,7 @@ void setup()
     if (s_haveFs)
         showImage(s_imgIndex); // erstes Bild sofort
     else
-        circleTextShow(tft, "LittleFS fehlt - 'pio run -e pico2 -t uploadfs'");
+        imageShowText(tft, "LittleFS fehlt - 'pio run -t uploadfs'");
 
     // Startstufe 0 % -> direkt schlafen legen.
     if (brightnessStepPercent() == 0)

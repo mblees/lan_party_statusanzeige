@@ -29,7 +29,7 @@ Optionen:
     --trim        Raender wegschneiden, auch bei --fit.
     --no-circle   keine Kreismaske.
 
-Auf dem Pico wird nichts mehr skaliert - das Bild kommt pixelgenau aufs Display.
+Auf dem ESP32 wird nichts mehr skaliert - das Bild kommt pixelgenau aufs Display.
 
 Requires Pillow ( pip install Pillow ).
 """

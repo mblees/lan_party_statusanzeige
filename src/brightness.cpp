@@ -16,16 +16,15 @@ static inline uint8_t pctToLevel(uint8_t pct)
 #if TFT_BL_PIN >= 0
 static inline void blWrite(uint8_t level)
 {
-    analogWrite(TFT_BL_PIN, TFT_BL_ACTIVE_HIGH ? level : (uint8_t)(255 - level));
+    const uint8_t duty = TFT_BL_ACTIVE_HIGH ? level : (uint8_t)(255 - level);
+    ledcWrite(TFT_BL_PIN, duty);
 }
 #endif
 
 void brightnessBegin()
 {
 #if TFT_BL_PIN >= 0
-    analogWriteFreq(TFT_BL_PWM_HZ);
-    analogWriteRange(255);
-    pinMode(TFT_BL_PIN, OUTPUT);
+    ledcAttach(TFT_BL_PIN, TFT_BL_PWM_HZ, 8);   // 8 Bit -> 0..255, wie analogWriteRange(255)
     imageSetBrightness(255);        // Pixel nicht zusaetzlich dimmen
 #endif
     if (s_stepIdx >= s_stepCount)

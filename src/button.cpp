@@ -40,3 +40,8 @@ bool buttonPressed(Button &b)
     }
     return false;
 }
+
+uint32_t buttonHeldMs(const Button &b)
+{
+    return b.stable ? (millis() - b.edgeAt) : 0;
+}

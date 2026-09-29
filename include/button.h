@@ -23,4 +23,10 @@ void buttonBegin(Button &b, uint8_t pin, bool activeHigh, uint16_t debounceMs);
 // (Flanke inaktiv -> aktiv); dauerhaftes Halten loest nur einen Impuls aus.
 bool buttonPressed(Button &b);
 
+// Wie lange der Taster gerade ununterbrochen (entprellt) gedrueckt/beruehrt
+// wird [ms]; 0, wenn er aktuell nicht aktiv ist. Im Gegensatz zu
+// buttonPressed() (nur die Druck-Flanke) fuer die Erkennung eines
+// Lang-Drucks in jedem loop()-Durchlauf gedacht.
+uint32_t buttonHeldMs(const Button &b);
+
 #endif // BUTTON_H

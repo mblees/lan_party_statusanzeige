@@ -14,9 +14,11 @@ static const float ADVANCE  = 6.0f * S;   // Vorschub pro Zeichen (x)
 static const float INK_H    = 7.0f * S;   // sichtbare Zeichenhoehe
 static const float LINE_H   = 8.0f * S;   // Zeilenabstand (y)
 
-static const float R   = (float)TFT_TEXT_RADIUS;
-static const float CX  = (TFT_WIDTH  - 1) / 2.0f;   // Kreismittelpunkt
-static const float CY  = (TFT_HEIGHT - 1) / 2.0f;
+// Umbruch-/Zentrierkreis. Standardwerte = ganzer sichtbarer Displaykreis;
+// circleTextShowIn() setzt sie pro Aufruf um (Single-Thread, unkritisch).
+static float R   = (float)TFT_TEXT_RADIUS;
+static float CX  = (TFT_WIDTH  - 1) / 2.0f;   // Kreismittelpunkt
+static float CY  = (TFT_HEIGHT - 1) / 2.0f;
 
 // Obergrenze fuer die Zeilenzahl (Groesse 1 -> ca. 29 Zeilen passen in den Kreis).
 #define MAX_LINES 32
@@ -174,9 +176,22 @@ static void layout(const char *text, char *out, size_t outCap)
     }
 }
 
-void circleTextShow(Adafruit_GC9A01A &tft, const char *text)
+void circleTextShow(Adafruit_GFX &gfx, const char *text)
 {
-    tft.fillScreen(TFT_TEXT_BG);
+    circleTextShowIn(gfx, text,
+                     (TFT_WIDTH  - 1) / 2.0f, (TFT_HEIGHT - 1) / 2.0f,
+                     (float)TFT_TEXT_RADIUS, true);
+}
+
+void circleTextShowIn(Adafruit_GFX &gfx, const char *text,
+                      float cx, float cy, float r, bool clear)
+{
+    CX = cx;
+    CY = cy;
+    R  = r;
+
+    if (clear)
+        gfx.fillScreen(TFT_TEXT_BG);
     if (text == nullptr || text[0] == '\0')
         return;
 
@@ -187,9 +202,9 @@ void circleTextShow(Adafruit_GC9A01A &tft, const char *text)
     if (lines == 0)
         return;
 
-    tft.setTextSize(S);
-    tft.setTextColor(TFT_TEXT_FG);
-    tft.setTextWrap(false);
+    gfx.setTextSize(S);
+    gfx.setTextColor(TFT_TEXT_FG);
+    gfx.setTextWrap(false);
 
     float y = firstLineTop(lines);
     const char *p = wrapped;
@@ -202,9 +217,9 @@ void circleTextShow(Adafruit_GC9A01A &tft, const char *text)
         int chars = (int)(e - p);
 
         int16_t x = (int16_t)lroundf(CX - inkWidth(chars) / 2.0f);
-        tft.setCursor(x, (int16_t)lroundf(y));
+        gfx.setCursor(x, (int16_t)lroundf(y));
         for (const char *c = p; c < e; c++)
-            tft.write((uint8_t)*c);
+            gfx.write((uint8_t)*c);
 
         y += LINE_H;
         p  = (*e == '\n') ? e + 1 : e;

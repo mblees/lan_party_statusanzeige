@@ -3,11 +3,10 @@
 Alles in diesem Ordner landet mit
 
 ```
-pio run -e pico2 -t uploadfs
+pio run -t uploadfs
 ```
 
-im LittleFS-Bereich des Pico-2-Flash (Groesse: `board_build.filesystem_size`
-in [platformio.ini](../platformio.ini)). Getrennt von der Firmware – Bilder
+im LittleFS-Bereich des ESP32-C3-Flash (Partitionstabelle der Board-Definition). Getrennt von der Firmware – Bilder
 tauschen geht also ohne Neucompilieren.
 
 ## Bilder

@@ -3,6 +3,7 @@
 #include <LittleFS.h>
 #include <PNGdec.h>
 #include "config.h"
+#include "circletext.h"
 
 // Zeilenpuffer-Grenze: der GC9A01 ist 240 px breit, etwas Reserve fuer
 // leicht zu grosse Vorlagen. Breitere PNGs weist imageShowPng() ab.
@@ -10,7 +11,7 @@
 #define IMAGE_MAX_FILES 16
 #define IMAGE_NAME_MAX  48
 
-static PNG  s_png;      // ~40 KB im BSS - fuer den RP2350 (520 KB RAM) unkritisch
+static PNG  s_png;      // ~40 KB im BSS - fuer den ESP32-C3 (400 KB SRAM) unkritisch
 static File s_file;
 
 static Adafruit_GC9A01A *s_tft     = nullptr;
@@ -26,7 +27,7 @@ static uint8_t s_brightness = 255;   // 0..255, Software-Dimmung; setzt brightne
 
 // Vollbild-Framebuffer (ungedimmt). Damit laesst sich die Helligkeit ohne
 // erneutes PNG-Dekodieren anpassen - imageRefresh() schiebt den Puffer nur
-// noch (gedimmt) auf das Display. ~115 KB im BSS, unkritisch fuer den RP2350.
+// noch (gedimmt) auf das Display. ~115 KB im BSS, unkritisch fuer den ESP32-C3.
 static uint16_t s_fb[TFT_WIDTH * TFT_HEIGHT];
 static bool     s_fbValid = false;
 
@@ -133,29 +134,35 @@ static int pngDraw(PNGDRAW *pDraw)
 static void scanPngs()
 {
     s_count = 0;
-    Dir dir = LittleFS.openDir("/");
-    while (dir.next() && s_count < IMAGE_MAX_FILES)
+    File root = LittleFS.open("/");
+    File file = root.openNextFile();
+    while (file && s_count < IMAGE_MAX_FILES)
     {
-        String name = dir.fileName();
-        if (!name.startsWith("/"))
-            name = "/" + name;
+        if (!file.isDirectory())
+        {
+            String name = file.name();
+            if (!name.startsWith("/"))
+                name = "/" + name;
 
-        String lower = name;
-        lower.toLowerCase();
-        if (!lower.endsWith(".png"))
-            continue;
-
-        snprintf(s_names[s_count], IMAGE_NAME_MAX, "%s", name.c_str());
-        s_count++;
+            String lower = name;
+            lower.toLowerCase();
+            if (lower.endsWith(".png"))
+            {
+                snprintf(s_names[s_count], IMAGE_NAME_MAX, "%s", name.c_str());
+                s_count++;
+            }
+        }
+        file = root.openNextFile();
     }
 }
 
 bool imageBegin()
 {
-    if (!LittleFS.begin())
+    const bool mounted = LittleFS.begin(true);   // true = bei Fehlschlag formatieren
+    if (!mounted)
     {
         Serial.println(F("[image] LittleFS-Mount fehlgeschlagen - "
-                         "'pio run -e pico2 -t uploadfs' ausgefuehrt?"));
+                         "'pio run -t uploadfs' ausgefuehrt?"));
         return false;
     }
 
@@ -190,6 +197,58 @@ void imageRefresh()
 {
     if (s_fbValid)
         blitFb();
+}
+
+// GFX-Ziel, das in den Vollbild-Framebuffer statt direkt auf das Panel zeichnet.
+// So laeuft Text (Adafruit-GFX-Font) durch dieselbe Software-Dimmung und
+// imageRefresh()-Logik wie ein dekodiertes PNG.
+namespace {
+class FbCanvas : public Adafruit_GFX
+{
+public:
+    FbCanvas() : Adafruit_GFX(TFT_WIDTH, TFT_HEIGHT) {}
+
+    void drawPixel(int16_t x, int16_t y, uint16_t color) override
+    {
+        if ((uint16_t)x < (uint16_t)TFT_WIDTH && (uint16_t)y < (uint16_t)TFT_HEIGHT)
+            s_fb[(uint32_t)y * TFT_WIDTH + x] = color;
+    }
+
+    void fillScreen(uint16_t color) override
+    {
+        for (uint32_t i = 0; i < (uint32_t)TFT_WIDTH * TFT_HEIGHT; i++)
+            s_fb[i] = color;
+    }
+};
+} // namespace
+
+static FbCanvas s_canvas;
+
+void imageShowText(Adafruit_GC9A01A &tft, const char *text)
+{
+    s_tft = &tft;
+    circleTextShow(s_canvas, text);   // zeichnet in s_fb
+    s_fbValid = true;
+    blitFb();
+}
+
+// --- Zusammengesetzte Frames (Grafik + Text) im Framebuffer aufbauen -------
+void imageBeginFrame(uint16_t bg)
+{
+    for (uint32_t i = 0; i < (uint32_t)TFT_WIDTH * TFT_HEIGHT; i++)
+        s_fb[i] = bg;
+}
+
+Adafruit_GFX &imageCanvas()
+{
+    return s_canvas;
+}
+
+void imageEndFrame(Adafruit_GC9A01A &tft)
+{
+    s_tft     = &tft;
+    s_fbValid = true;
+    blitFb();
 }
 
 bool imageShowPng(Adafruit_GC9A01A &tft, const char *path, uint16_t bg)
