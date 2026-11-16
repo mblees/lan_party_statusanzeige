@@ -14,17 +14,32 @@ static inline uint8_t pctToLevel(uint8_t pct)
 }
 
 #if TFT_BL_PIN >= 0
+// Arduino-ESP32 3.x adressiert die LEDC-PWM ueber den Pin, 2.x (Stand der
+// PlatformIO-Plattform espressif32 6.x) ueber einen Kanal - beide unterstuetzen.
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+#define BL_LEDC_TARGET TFT_BL_PIN
+#else
+#define BL_LEDC_CHANNEL 0
+#define BL_LEDC_TARGET  BL_LEDC_CHANNEL
+#endif
+
 static inline void blWrite(uint8_t level)
 {
     const uint8_t duty = TFT_BL_ACTIVE_HIGH ? level : (uint8_t)(255 - level);
-    ledcWrite(TFT_BL_PIN, duty);
+    ledcWrite(BL_LEDC_TARGET, duty);
 }
 #endif
 
 void brightnessBegin()
 {
 #if TFT_BL_PIN >= 0
-    ledcAttach(TFT_BL_PIN, TFT_BL_PWM_HZ, 8);   // 8 Bit -> 0..255, wie analogWriteRange(255)
+    // 8 Bit -> 0..255, wie analogWriteRange(255)
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcAttach(TFT_BL_PIN, TFT_BL_PWM_HZ, 8);
+#else
+    ledcSetup(BL_LEDC_CHANNEL, TFT_BL_PWM_HZ, 8);
+    ledcAttachPin(TFT_BL_PIN, BL_LEDC_CHANNEL);
+#endif
     imageSetBrightness(255);        // Pixel nicht zusaetzlich dimmen
 #endif
     if (s_stepIdx >= s_stepCount)
