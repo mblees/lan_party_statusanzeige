@@ -15,6 +15,7 @@ Adafruit_GC9A01A tft(TFT_CS_PIN, TFT_DC_PIN, TFT_RST_PIN); // Hardware-SPI (Stan
 // TTP223 an TOUCH_IMAGE_PIN  : naechstes Bild
 // TTP223 an TOUCH_BRIGHT_PIN : naechste Helligkeitsstufe (0/25/50/75/100 %);
 //                              0 % legt das Display schlafen, jede andere weckt es
+// Serial (USB-C)             : jede Textzeile erscheint als Statustext im Kreis
 
 static bool   s_haveFs   = false;
 static size_t s_imgIndex = 0;
@@ -95,6 +96,44 @@ static void brightnessStepTouched()
     }
 }
 
+// ---- Serial -> Display (siehe "Text-Ausgabe" in config.h) ----
+// Jede mit '\n' abgeschlossene Zeile wird zentriert im sichtbaren Kreis
+// ausgegeben, eine leere Zeile loescht das Display. Nicht-blockierend: es wird
+// nur gelesen, was bereits im Empfangspuffer liegt.
+static char   s_rxLine[SERIAL_LINE_MAX + 1];
+static size_t s_rxLen = 0;
+
+static void pollSerialText()
+{
+    while (Serial.available() > 0)
+    {
+        const char c = (char)Serial.read();
+        if (c == '\r')
+            continue;
+        if (c != '\n')
+        {
+            if (s_rxLen < SERIAL_LINE_MAX)
+                s_rxLine[s_rxLen++] = c;  // Ueberlaenge wird verworfen
+            continue;
+        }
+
+        s_rxLine[s_rxLen] = '\0';
+        s_rxLen = 0;
+        Serial.printf("[text] \"%s\"\n", s_rxLine);
+
+        if (s_asleep)
+        {
+            // Nur den Framebuffer neu aufbauen; displaySetSleep(false) gibt
+            // ihn beim Aufwachen per imageRefresh() aus.
+            circleTextShow(imageCanvas(), s_rxLine);
+        }
+        else
+        {
+            imageShowText(tft, s_rxLine);
+        }
+    }
+}
+
 void setup()
 {
     Serial.begin(BAUD_RATE);
@@ -143,4 +182,6 @@ void loop()
 
     if (imageHit && s_haveFs && !s_asleep)
         showNextImage();
+
+    pollSerialText();
 }
